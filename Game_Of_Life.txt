@@ -1,0 +1,296 @@
+INCLUDE Irvine32.inc
+.386
+.model flat, stdcall
+.stack 4096
+ExitProcess PROTO, deExitCode:DWORD
+	maxRows = 5
+	maxCols = 5
+	counter = 1
+.data
+
+	array1 BYTE maxCols * maxRows DUP('0')
+	array2 BYTE maxCols * maxRows DUP('0')
+	isAlive BYTE '1'
+	iRow BYTE 1
+	iCol BYTE 1
+	
+
+.code
+main PROC
+
+	call SetAlive
+
+	;call PrintArray1
+	;Call Read
+	;call crlf
+	;call PrintArray2
+	;call crlf
+
+playGame:
+	mov EDX,0
+	call GoToXY
+	
+	call PrintArray1
+	Call Read
+	;call crlf
+	call CopyArray
+
+	mov EAX, 1000
+	call Delay
+
+	loop playGame
+
+	INVOKE ExitProcess, 0
+main ENDP
+
+PrintArray1 PROC
+
+	mov esi, OFFSET array1
+	mov ecx, maxRows
+
+L1:	
+	push ecx
+	mov ecx, maxCols
+
+L2: 
+	mov al, [esi]
+	call WriteChar
+	inc esi
+	loop L2
+	call crlf
+	pop ecx
+	loop L1
+	ret
+
+PrintArray1 ENDP
+
+
+PrintArray2 PROC
+
+	mov edi, OFFSET array2
+	mov ecx, maxRows
+
+L1:	
+	push ecx
+	mov ecx, maxCols
+
+L2: 
+	mov al, [edi]
+	call WriteChar
+	inc edi
+	loop L2
+	call crlf
+	pop ecx
+	loop L1
+	ret
+
+PrintArray2 ENDP
+
+
+SetAlive PROC
+
+	mov esi, OFFSET array1
+	mov BYTE PTR [esi + 7], '1'
+	mov BYTE PTR [esi + 12], '1'
+	mov BYTE PTR [esi + 17], '1'
+	ret
+
+SetAlive ENDP
+
+
+
+SetGlider PROC
+
+	mov esi, OFFSET array1
+	mov BYTE PTR [esi + 13], '1'
+	mov BYTE PTR [esi + 21], '1'
+	mov BYTE PTR [esi + 23], '1'
+	mov BYTE PTR [esi + 32], '1'
+	mov BYTE PTR [esi + 33], '1'
+	ret
+
+SetGlider ENDP
+
+
+
+CopyArray PROC
+	mov esi, 0
+	mov edi, OFFSET array2
+	mov ecx, maxRows * maxCols	
+L1:								
+	mov bl, [edi] 				
+	mov array1[esi], bl				
+	inc esi				
+	inc edi				
+	loop L1											
+	ret
+							
+CopyArray ENDP
+
+;;;the algorithm that is going to represent a set position is eax = (row * maxCols) + col then you add [esi] + eax = position
+;;; example you want to be in position 1,1 when you start the game (to have gutters) eax = (1 * maxCols) + 1 = 6 which is the 
+;;; element that represents the coordinate 1,1 since we are working with 1 long array.
+
+Count PROC
+	
+TopLeft:			;check top left of target
+	
+	sub esi, maxCols + 1	
+	mov al, array1[esi]
+	cmp al, isAlive		;check if al == 1
+	Jne TopMid			;if al != 1 skip
+	inc ebx				;inc
+	
+
+TopMid:				;check top mid of target
+	add esi, 1
+	mov al, array1[esi]
+	cmp al, isAlive		;check if al == 1
+	Jne TopRight			;if al != 1 skip
+	inc ebx					;inc
+	
+
+TopRight:			;check top right of target
+	add esi, 1
+	mov al, array1[esi]
+	cmp al, isAlive		;check if al == 1
+	Jne MidRight			;if al != 1 skip
+	inc ebx					;inc
+	
+
+MidRight:			;check mid right of target
+	add esi, maxCols
+	mov al, array1[esi]
+	cmp al, isAlive		;check if al == 1
+	Jne BotRight			;if al != 1 skip
+	inc ebx					;inc
+	
+
+BotRight:			;check bot right of target
+	add esi, maxCols
+	mov al, array1[esi]
+	cmp al, isAlive		;check if al == 1
+	Jne BotMid			;if al != 1 skip
+	inc ebx					;inc
+	
+
+BotMid:				;check bot mid of target
+	sub esi, 1
+	mov al, array1[esi]
+	cmp al, isAlive		;check if al == 1
+	Jne BotLeft			;if al != 1 skip
+	inc ebx					;inc
+	
+
+BotLeft:			;check bot left of target
+	sub esi, 1
+	mov al, array1[esi]
+	cmp al, isAlive		;check if al == 1
+	Jne MidLeft			;if al != 1 skip
+	inc ebx					;inc
+
+
+MidLeft:			;check mid left of target
+	sub esi, maxCols
+	mov al, array1[esi]
+	cmp al, isAlive		;check if al == 1
+	Jne Center			;if al != 1 skip
+	inc ebx					;inc
+	
+
+Center:				;return to target position and check
+	add esi, 1
+	mov al, array1[esi]
+	cmp al, isAlive		;check if al == 1
+	Jne next			;if al != 1 skip
+	inc ebx					;inc
+
+next:
+	
+	call Mark
+	
+	ret
+
+Count ENDP
+
+Read PROC
+	
+	mov esi, 0
+	mov edi, OFFSET array2
+	mov iCol, 1
+	mov iRow, 1
+
+	mov eax, 0		;refresh the counter, which will keep track if a cell should die or live..etc
+	mov al, iRow
+	mov dl, maxCols
+	mul dl
+	mov bl, iCol
+	add al, bl
+	mov esi, eax	;start at (1,1)... esi is index 1,1
+		
+			
+
+	;;^^^^the whole purpose of the top portion is just to get to 1,1 everything else bellow should handle reading correctly, via nested loop
+
+	mov eax, 0
+	mov ebx, 0	;neighbor count
+	mov ecx, maxRows - 2
+
+L1:
+	push ecx
+	mov ecx, maxCols - 2 
+
+L2:
+mov eax, 0
+	mov ebx, 0
+	; esi is set to array index
+	; edi is pointing to array2
+	call Count
+
+	;mov edi, 0
+	
+	inc esi
+	
+	loop L2
+
+	pop ecx			;this is supposed to be the outer counter for maxRows
+	add esi, 2
+	loop L1
+
+	ret
+
+Read ENDP
+
+Mark PROC
+	
+	
+	cmp ebx, 0					
+	je dead						
+	cmp ebx, 1					
+	je dead						
+	cmp ebx, 2					
+	je dead					
+	cmp ebx, 3					
+	je spawn					
+	cmp ebx, 4					
+	jge alive					
+
+dead:
+	mov array2[esi], '0'		
+	jmp next
+
+alive:
+	cmp array1[esi], '1'
+	je spawn
+	jmp dead					
+
+spawn:
+	mov array2[esi], '1'		
+	jmp next
+
+next:
+	ret							
+
+Mark ENDP
+
+END main
